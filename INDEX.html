@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학 브롤러즈 - 일차방정식 보스전</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Black Han Sans & Inter & JetBrains Mono -->
+    <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brawl: {
+                            yellow: '#fcc011',
+                            red: '#e62344',
+                            blue: '#1485ff',
+                            purple: '#8c28e6',
+                            green: '#2be34e',
+                            dark: '#0c0f1d',
+                            card: '#181e36',
+                            border: '#2e3860'
+                        }
+                    },
+                    fontFamily: {
+                        brawl: ['Black Han Sans', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #080a14;
+            color: #ffffff;
+            font-family: 'Inter', sans-serif;
+            user-select: none;
+        }
+
+        .font-brawl {
+            font-family: 'Black Han Sans', sans-serif;
+            letter-spacing: 0.5px;
+        }
+
+        .text-stroke {
+            -webkit-text-stroke: 1.5px #000;
+        }
+
+        .text-stroke-lg {
+            -webkit-text-stroke: 2.5px #000;
+        }
+
+        /* Animations */
+        @keyframes attackPlayer {
+            0% { transform: translateX(0) scale(1); }
+            50% { transform: translateX(60px) scale(1.15) rotate(5deg); }
+            100% { transform: translateX(0) scale(1); }
+        }
+
+        @keyframes bossHit {
+            0% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+            20% { transform: scale(0.9) rotate(-10deg); filter: brightness(3) sepia(1) hue-rotate(-50deg) saturate(5); }
+            40% { transform: scale(1.05) rotate(10deg); filter: brightness(2); }
+            100% { transform: scale(1) rotate(0deg); filter: brightness(1); }
+        }
+
+        @keyframes floatDamage {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            50% { opacity: 1; transform: translateY(-40px) scale(1.3); }
+            100% { opacity: 0; transform: translateY(-80px) scale(0.8); }
+        }
+
+        @keyframes shakeScreen {
+            0%, 100% { transform: translate(0, 0); }
+            20% { transform: translate(-8px, 5px); }
+            40% { transform: translate(8px, -5px); }
+            60% { transform: translate(-5px, 2px); }
+            80% { transform: translate(5px, -2px); }
+        }
+
+        .anim-attack {
+            animation: attackPlayer 0.35s ease-out;
+        }
+
+        .anim-hit {
+            animation: bossHit 0.4s ease-out;
+        }
+
+        .anim-shake {
+            animation: shakeScreen 0.3s ease-in-out;
+        }
+
+        .damage-pop {
+            animation: floatDamage 0.8s ease-out forwards;
+        }
+
+        .brawl-btn {
+            box-shadow: 0 6px 0 #000, 0 8px 15px rgba(0,0,0,0.5);
+            transition: all 0.1s ease;
+        }
+
+        .brawl-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 #000, 0 3px 8px rgba(0,0,0,0.5);
+        }
+
+        .brawl-card {
+            box-shadow: 0 8px 0 rgba(0,0,0,0.4);
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-3 sm:p-5 relative overflow-x-hidden">
+
+    <!-- Floating Damage Effect Layer -->
+    <div id="damage-layer" class="pointer-events-none fixed inset-0 z-50 overflow-hidden"></div>
+
+    <div id="app" class="w-full max-w-xl bg-brawl-card rounded-3xl border-4 border-brawl-border p-4 sm:p-6 shadow-2xl relative overflow-hidden transition-all duration-300">
+        
+        <!-- Top Game Header -->
+        <div class="flex justify-between items-center mb-4 pb-3 border-b-2 border-brawl-border">
+            <div class="flex items-center gap-2">
+                <div class="bg-brawl-yellow text-black font-brawl px-3 py-1 rounded-xl text-lg sm:text-xl shadow-md border-2 border-black flex items-center gap-1">
+                    <i class="fa-solid fa-crown text-amber-800"></i> MATH BRAWL
+                </div>
+            </div>
+            <div id="difficulty-badge" class="bg-brawl-purple text-white font-brawl text-xs sm:text-sm px-3 py-1 rounded-lg border-2 border-black tracking-wide">
+                보통 난이도
+            </div>
+        </div>
+
+        <!-- SCREEN 1: Character & Difficulty Select -->
+        <div id="select-screen" class="space-y-6 py-2">
+            
+            <div class="text-center">
+                <h1 class="text-3xl sm:text-4xl font-brawl text-brawl-yellow text-stroke tracking-wider mb-1">
+                    브롤러 & 난이도 선택
+                </h1>
+                <p class="text-slate-400 text-xs sm:text-sm">수학 방정식으로 악당 보스를 물리치세요!</p>
+            </div>
+
+            <!-- Brawler Selection Carousel/Grid -->
+            <div>
+                <label class="block text-slate-300 font-brawl text-sm mb-2"><i class="fa-solid fa-user-ninja text-brawl-yellow"></i> 브롤러 선택</label>
+                <div class="grid grid-cols-3 gap-2 sm:gap-3" id="brawler-options">
+                    <!-- BRAWLER 1 -->
+                    <div onclick="selectBrawler('colt')" id="brawler-colt" class="brawler-card cursor-pointer bg-slate-800/90 border-4 border-brawl-blue rounded-2xl p-2 sm:p-3 text-center transition transform hover:-translate-y-1 relative">
+                        <div class="text-3xl sm:text-4xl mb-1">🤠</div>
+                        <div class="font-brawl text-xs sm:text-sm text-brawl-blue">스피드 콜트</div>
+                        <div class="text-[10px] text-slate-400 mt-1">공격력: 100<br>특수: 빠른 사격</div>
+                    </div>
+                    <!-- BRAWLER 2 -->
+                    <div onclick="selectBrawler('elprimo')" id="brawler-elprimo" class="brawler-card cursor-pointer bg-slate-800/90 border-4 border-slate-600 rounded-2xl p-2 sm:p-3 text-center transition transform hover:-translate-y-1 relative">
+                        <div class="text-3xl sm:text-4xl mb-1">🥊</div>
+                        <div class="font-brawl text-xs sm:text-sm text-white">파워 프리모</div>
+                        <div class="text-[10px] text-slate-400 mt-1">공격력: 150<br>특수: 묵직한 한방</div>
+                    </div>
+                    <!-- BRAWLER 3 -->
+                    <div onclick="selectBrawler('spike')" id="brawler-spike" class="brawler-card cursor-pointer bg-slate-800/90 border-4 border-slate-600 rounded-2xl p-2 sm:p-3 text-center transition transform hover:-translate-y-1 relative">
+                        <div class="text-3xl sm:text-4xl mb-1">🌵</div>
+                        <div class="font-brawl text-xs sm:text-sm text-white">가시 스파이크</div>
+                        <div class="text-[10px] text-slate-400 mt-1">공격력: 120<br>특수: 크리티컬</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Difficulty Selection -->
+            <div>
+                <label class="block text-slate-300 font-brawl text-sm mb-2"><i class="fa-solid fa-gauge-high text-brawl-red"></i> 난이도 선택</label>
+                <div class="grid grid-cols-3 gap-2 sm:gap-3" id="difficulty-options">
+                    <button onclick="selectDifficulty('easy')" id="diff-easy" class="py-2.5 rounded-xl font-brawl text-xs sm:text-sm border-2 border-black bg-slate-800 text-slate-400 transition">
+                        이키 (EASY)<br><span class="text-[10px] font-normal opacity-80">ax = b</span>
+                    </button>
+                    <button onclick="selectDifficulty('normal')" id="diff-normal" class="py-2.5 rounded-xl font-brawl text-xs sm:text-sm border-2 border-black bg-brawl-purple text-white transition">
+                        노멀 (NORMAL)<br><span class="text-[10px] font-normal opacity-80">ax + b = c</span>
+                    </button>
+                    <button onclick="selectDifficulty('hard')" id="diff-hard" class="py-2.5 rounded-xl font-brawl text-xs sm:text-sm border-2 border-black bg-slate-800 text-slate-400 transition">
+                        하드 (HARD)<br><span class="text-[10px] font-normal opacity-80">a(x+b) = c</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Start Game Button -->
+            <button onclick="startGame()" class="brawl-btn w-full py-4 bg-brawl-yellow hover:bg-amber-400 text-black font-brawl text-2xl rounded-2xl border-2 border-black uppercase tracking-wider flex items-center justify-center gap-2">
+                <i class="fa-solid fa-play"></i> 보스전 시작!
+            </button>
+        </div>
+
+        <!-- SCREEN 2: Battle Arena (Game Active) -->
+        <div id="game-screen" class="hidden space-y-4">
+            
+            <!-- Battle Field Area -->
+            <div class="bg-gradient-to-b from-slate-900 to-slate-950 border-4 border-slate-800 rounded-2xl p-4 relative overflow-hidden">
+                
+                <!-- Boss Gauge & Info -->
+                <div class="mb-3">
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-brawl text-brawl-red text-sm flex items-center gap-1">
+                            <i class="fa-solid fa-skull"></i> 보스 로봇 (HP)
+                        </span>
+                        <span id="boss-hp-text" class="font-mono font-bold text-xs text-slate-300">2000 / 2000</span>
+                    </div>
+                    <div class="w-full bg-slate-800 h-5 rounded-full overflow-hidden border-2 border-black p-0.5 relative">
+                        <div id="boss-hp-bar" class="bg-gradient-to-r from-red-600 to-brawl-red h-full rounded-full transition-all duration-300 w-full"></div>
+                    </div>
+                </div>
+
+                <!-- Battle Characters Visual Arena -->
+                <div class="flex justify-between items-center py-4 px-4 sm:px-8 relative min-h-[140px]">
+                    <!-- Player Character -->
+                    <div id="player-sprite-box" class="text-center transition-transform">
+                        <div id="player-emoji" class="text-6xl sm:text-7xl drop-shadow-lg filter">🤠</div>
+                        <div id="player-name-tag" class="font-brawl text-xs text-brawl-yellow mt-1 bg-black/60 px-2 py-0.5 rounded-md border border-brawl-yellow/40">
+                            콜트
+                        </div>
+                    </div>
+
+                    <!-- Versus Icon -->
+                    <div class="font-brawl text-2xl sm:text-3xl text-slate-600 text-stroke italic">VS</div>
+
+                    <!-- Boss Monster -->
+                    <div id="boss-sprite-box" class="text-center transition-transform">
+                        <div id="boss-emoji" class="text-6xl sm:text-7xl drop-shadow-lg">🤖</div>
+                        <div class="font-brawl text-xs text-brawl-red mt-1 bg-black/60 px-2 py-0.5 rounded-md border border-brawl-red/40">
+                            빅 보스
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ultimate Skill Gauge -->
+                <div class="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex justify-between text-[11px] font-brawl mb-0.5">
+                            <span class="text-brawl-yellow">ULTIMATE GAUGES</span>
+                            <span id="ult-text" class="text-brawl-yellow">0 / 3</span>
+                        </div>
+                        <div class="w-full bg-slate-800 h-3 rounded-full border border-black overflow-hidden p-0.5">
+                            <div id="ult-bar" class="bg-brawl-yellow h-full rounded-full transition-all duration-300 w-0"></div>
+                        </div>
+                    </div>
+                    <button id="ult-btn" onclick="useUltimateSkill()" disabled class="brawl-btn bg-slate-700 text-slate-500 font-brawl text-xs px-3 py-2 rounded-xl border border-black disabled:opacity-50 disabled:cursor-not-allowed">
+                        <i class="fa-solid fa-bolt"></i> 필살기!
+                    </button>
+                </div>
+            </div>
+
+            <!-- Timer & Math Question Screen -->
+            <div class="bg-slate-900 border-4 border-brawl-border rounded-2xl p-4 sm:p-5 text-center relative">
+                
+                <!-- Timer Gauge -->
+                <div class="flex justify-between items-center mb-2">
+                    <span class="font-brawl text-xs text-slate-400">제한시간</span>
+                    <span id="timer-text" class="font-mono font-extrabold text-brawl-green text-lg">30s</span>
+                </div>
+                <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden border border-black mb-4">
+                    <div id="timer-bar" class="bg-brawl-green h-full w-full transition-all duration-100"></div>
+                </div>
+
+                <div class="text-xs font-brawl text-slate-400 mb-1">방정식을 풀어 공격하세요!</div>
+                <!-- Equation Display -->
+                <div id="equation" class="text-3xl sm:text-4xl font-mono font-extrabold text-white tracking-wider my-2 py-2 bg-slate-950 rounded-xl border-2 border-slate-800">
+                    2x + 4 = 10
+                </div>
+
+                <!-- Answer Form -->
+                <form onsubmit="handleAnswerSubmit(event)" class="mt-4 flex gap-2">
+                    <input type="number" step="any" id="answer-input" placeholder="x 의 값" 
+                           class="flex-1 bg-slate-950 border-2 border-slate-700 focus:border-brawl-yellow focus:outline-none text-white font-mono text-xl text-center py-3 rounded-xl placeholder:text-slate-600 transition" 
+                           autocomplete="off">
+                    <button type="submit" class="brawl-btn px-6 bg-brawl-green hover:bg-emerald-400 text-black font-brawl text-xl rounded-xl border-2 border-black">
+                        공격!
+                    </button>
+                </form>
+            </div>
+
+        </div>
+
+        <!-- SCREEN 3: Game Over / Victory Screen -->
+        <div id="result-screen" class="hidden text-center py-4 space-y-5">
+            
+            <div id="result-banner" class="py-3 rounded-2xl border-4 border-black font-brawl text-3xl sm:text-4xl text-stroke shadow-xl">
+                VICTORY!
+            </div>
+
+            <div class="text-7xl py-2" id="result-emoji">
+                🏆
+            </div>
+
+            <!-- Stats Box -->
+            <div class="bg-slate-900 border-2 border-brawl-border rounded-2xl p-4 space-y-3 font-brawl text-sm">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-slate-400">격파한 보스 HP</span>
+                    <span id="res-damage" class="font-mono text-brawl-red text-lg">2000</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-slate-400">맞힌 문제 수</span>
+                    <span id="res-correct" class="font-mono text-brawl-green text-lg">0개</span>
+                </div>
+                <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+                    <span class="text-slate-400">정답률</span>
+                    <span id="res-accuracy" class="font-mono text-brawl-yellow text-lg">0%</span>
+                </div>
+                <div class="flex justify-between items-center pt-1">
+                    <span class="text-white text-base">최종 점수</span>
+                    <span id="res-score" class="font-mono text-brawl-yellow text-2xl text-stroke">0 PT</span>
+                </div>
+            </div>
+
+            <!-- Restart Button -->
+            <button onclick="showSelectScreen()" class="brawl-btn w-full py-4 bg-brawl-yellow hover:bg-amber-400 text-black font-brawl text-xl rounded-2xl border-2 border-black flex items-center justify-center gap-2">
+                <i class="fa-solid fa-rotate-right"></i> 다시 도전하기
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Character Profiles
+        const BRAWLERS = {
+            colt: { name: '스피드 콜트', emoji: '🤠', atk: 120, ultName: '불꽃 연사' },
+            elprimo: { name: '파워 프리모', emoji: '🥊', atk: 180, ultName: '프리모 드롭' },
+            spike: { name: '가시 스파이크', emoji: '🌵', atk: 140, ultName: '가시 수류탄' }
+        };
+
+        // Game Settings & State
+        let selectedBrawlerKey = 'colt';
+        let selectedDifficulty = 'normal';
+
+        const MAX_TIME = 30;
+        let timer = MAX_TIME;
+        let timerInterval = null;
+
+        let maxBossHp = 2000;
+        let currentBossHp = 2000;
+        let ultGauge = 0; // max 3
+        
+        let score = 0;
+        let correctCount = 0;
+        let totalAttempts = 0;
+        let currentAnswer = null;
+
+        // DOM Elements
+        const selectScreen = document.getElementById('select-screen');
+        const gameScreen = document.getElementById('game-screen');
+        const resultScreen = document.getElementById('result-screen');
+        
+        const bossHpBar = document.getElementById('boss-hp-bar');
+        const bossHpText = document.getElementById('boss-hp-text');
+        const timerText = document.getElementById('timer-text');
+        const timerBar = document.getElementById('timer-bar');
+        const equationDisplay = document.getElementById('equation');
+        const answerInput = document.getElementById('answer-input');
+        const ultBar = document.getElementById('ult-bar');
+        const ultText = document.getElementById('ult-text');
+        const ultBtn = document.getElementById('ult-btn');
+
+        const playerSpriteBox = document.getElementById('player-sprite-box');
+        const bossSpriteBox = document.getElementById('boss-sprite-box');
+        const playerEmoji = document.getElementById('player-emoji');
+        const playerNameTag = document.getElementById('player-name-tag');
+
+        // Character Select Handler
+        function selectBrawler(key) {
+            selectedBrawlerKey = key;
+            ['colt', 'elprimo', 'spike'].forEach(k => {
+                const card = document.getElementById(`brawler-${k}`);
+                if (k === key) {
+                    card.classList.add('border-brawl-blue');
+                    card.classList.remove('border-slate-600');
+                } else {
+                    card.classList.remove('border-brawl-blue');
+                    card.classList.add('border-slate-600');
+                }
+            });
+        }
+
+        // Difficulty Select Handler
+        function selectDifficulty(diff) {
+            selectedDifficulty = diff;
+            const badge = document.getElementById('difficulty-badge');
+            
+            ['easy', 'normal', 'hard'].forEach(d => {
+                const btn = document.getElementById(`diff-${d}`);
+                if (d === diff) {
+                    btn.className = 'py-2.5 rounded-xl font-brawl text-xs sm:text-sm border-2 border-black bg-brawl-purple text-white transition';
+                } else {
+                    btn.className = 'py-2.5 rounded-xl font-brawl text-xs sm:text-sm border-2 border-black bg-slate-800 text-slate-400 transition';
+                }
+            });
+
+            if (diff === 'easy') {
+                badge.textContent = '쉬움 난이도';
+                badge.className = 'bg-brawl-green text-black font-brawl text-xs sm:text-sm px-3 py-1 rounded-lg border-2 border-black';
+                maxBossHp = 1200;
+            } else if (diff === 'normal') {
+                badge.textContent = '보통 난이도';
+                badge.className = 'bg-brawl-purple text-white font-brawl text-xs sm:text-sm px-3 py-1 rounded-lg border-2 border-black';
+                maxBossHp = 2000;
+            } else {
+                badge.textContent = '하드 난이도';
+                badge.className = 'bg-brawl-red text-white font-brawl text-xs sm:text-sm px-3 py-1 rounded-lg border-2 border-black';
+                maxBossHp = 3000;
+            }
+        }
+
+        function showSelectScreen() {
+            resultScreen.classList.add('hidden');
+            gameScreen.classList.add('hidden');
+            selectScreen.classList.remove('hidden');
+        }
+
+        /**
+         * Equation Generator based on Difficulty
+         */
+        function generateEquation() {
+            let x = Math.floor(Math.random() * 19) - 9; // -9 to 9
+            if (x === 0) x = 2; // avoid 0 for simplicity
+
+            let a = Math.floor(Math.random() * 9) + 1; // 1 to 9
+            if (Math.random() > 0.5) a = -a;
+
+            let b = Math.floor(Math.random() * 21) - 10; // -10 to 10
+            
+            if (selectedDifficulty === 'easy') {
+                // ax = c
+                let c = a * x;
+                currentAnswer = x;
+                let aStr = a === 1 ? '' : (a === -1 ? '-' : a.toString());
+                equationDisplay.textContent = `${aStr}x = ${c}`;
+
+            } else if (selectedDifficulty === 'normal') {
+                // ax + b = c
+                let c = (a * x) + b;
+                currentAnswer = x;
+                let aStr = a === 1 ? '' : (a === -1 ? '-' : a.toString());
+                let bStr = b > 0 ? ` + ${b}` : (b < 0 ? ` - ${Math.abs(b)}` : '');
+                equationDisplay.textContent = `${aStr}x${bStr} = ${c}`;
+
+            } else {
+                // hard: a(x + b) = c
+                let c = a * (x + b);
+                currentAnswer = x;
+                let bStr = b > 0 ? ` + ${b}` : (b < 0 ? ` - ${Math.abs(b)}` : '');
+                let aStr = a === 1 ? '' : (a === -1 ? '-' : a.toString());
+                equationDisplay.textContent = `${aStr}(x${bStr}) = ${c}`;
+            }
+        }
+
+        function startGame() {
+            // Setup Player Character Info
+            const brawler = BRAWLERS[selectedBrawlerKey];
+            playerEmoji.textContent = brawler.emoji;
+            playerNameTag.textContent = brawler.name;
+
+            // Reset Game Variables
+            currentBossHp = maxBossHp;
+            score = 0;
+            correctCount = 0;
+            totalAttempts = 0;
+            ultGauge = 0;
+            timer = MAX_TIME;
+
+            updateHpBar();
+            updateUltBar();
+            
+            // UI Toggle
+            selectScreen.classList.add('hidden');
+            resultScreen.classList.add('hidden');
+            gameScreen.classList.remove('hidden');
+
+            generateEquation();
+
+            setTimeout(() => {
+                answerInput.value = '';
+                answerInput.focus();
+            }, 100);
+
+            // Start Timer Loop
+            clearInterval(timerInterval);
+            const startTime = Date.now();
+
+            timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                timer = MAX_TIME - elapsed;
+
+                if (timer <= 0) {
+                    timer = 0;
+                    endGame(false);
+                }
+
+                timerText.textContent = `${timer}s`;
+                const progressPercent = (timer / MAX_TIME) * 100;
+                timerBar.style.width = `${Math.max(0, progressPercent)}%`;
+            }, 200);
+        }
+
+        function handleAnswerSubmit(e) {
+            e.preventDefault();
+            const val = answerInput.value.trim();
+            if (val === '') return;
+
+            const userAns = parseFloat(val);
+            totalAttempts++;
+
+            if (Math.abs(userAns - currentAnswer) < 0.001) {
+                // Correct Attack!
+                correctCount++;
+                const brawler = BRAWLERS[selectedBrawlerKey];
+                let damage = brawler.atk + Math.floor(Math.random() * 30);
+
+                // Attack Animation
+                triggerAttackAnimation(damage, false);
+
+                // Ultimate Gauge Charge
+                if (ultGauge < 3) {
+                    ultGauge++;
+                    updateUltBar();
+                }
+
+                currentBossHp = Math.max(0, currentBossHp - damage);
+                score += damage * 2;
+                updateHpBar();
+
+                if (currentBossHp <= 0) {
+                    endGame(true); // Victory!
+                    return;
+                }
+            } else {
+                // Wrong Answer Effect
+                triggerWrongAnimation();
+            }
+
+            answerInput.value = '';
+            generateEquation();
+            answerInput.focus();
+        }
+
+        function useUltimateSkill() {
+            if (ultGauge < 3) return;
+
+            ultGauge = 0;
+            updateUltBar();
+
+            const brawler = BRAWLERS[selectedBrawlerKey];
+            let damage = brawler.atk * 2.5 + Math.floor(Math.random() * 50);
+
+            triggerAttackAnimation(damage, true);
+
+            currentBossHp = Math.max(0, currentBossHp - damage);
+            score += damage * 2;
+            updateHpBar();
+
+            if (currentBossHp <= 0) {
+                endGame(true);
+            } else {
+                generateEquation();
+                answerInput.focus();
+            }
+        }
+
+        function triggerAttackAnimation(damage, isUlt) {
+            playerSpriteBox.classList.add('anim-attack');
+            setTimeout(() => playerSpriteBox.classList.remove('anim-attack'), 350);
+
+            setTimeout(() => {
+                bossSpriteBox.classList.add('anim-hit');
+                document.getElementById('app').classList.add('anim-shake');
+
+                setTimeout(() => {
+                    bossSpriteBox.classList.remove('anim-hit');
+                    document.getElementById('app').classList.remove('anim-shake');
+                }, 400);
+
+                // Damage Pop Text
+                spawnDamageText(damage, isUlt);
+            }, 150);
+        }
+
+        function triggerWrongAnimation() {
+            document.getElementById('app').classList.add('anim-shake');
+            spawnDamageText("MISS!", false, true);
+            setTimeout(() => {
+                document.getElementById('app').classList.remove('anim-shake');
+            }, 300);
+        }
+
+        function spawnDamageText(text, isUlt = false, isMiss = false) {
+            const layer = document.getElementById('damage-layer');
+            const el = document.createElement('div');
+            
+            el.className = `fixed font-brawl text-stroke-lg text-3xl sm:text-5xl pointer-events-none damage-pop z-50`;
+            if (isMiss) {
+                el.classList.add('text-slate-400');
+            } else if (isUlt) {
+                el.classList.add('text-brawl-yellow', 'scale-125');
+                text = `ULTIMATE! -${text}`;
+            } else {
+                el.classList.add('text-brawl-red');
+                text = `-${text}`;
+            }
+
+            el.textContent = text;
+            
+            // Random offset near center
+            const x = window.innerWidth / 2 + (Math.random() * 100 - 50);
+            const y = window.innerHeight / 2 - 80 + (Math.random() * 40 - 20);
+
+            el.style.left = `${x}px`;
+            el.style.top = `${y}px`;
+
+            layer.appendChild(el);
+            setTimeout(() => el.remove(), 800);
+        }
+
+        function updateHpBar() {
+            const percent = (currentBossHp / maxBossHp) * 100;
+            bossHpBar.style.width = `${percent}%`;
+            bossHpText.textContent = `${currentBossHp} / ${maxBossHp}`;
+        }
+
+        function updateUltBar() {
+            const percent = (ultGauge / 3) * 100;
+            ultBar.style.width = `${percent}%`;
+            ultText.textContent = `${ultGauge} / 3`;
+
+            if (ultGauge >= 3) {
+                ultBtn.disabled = false;
+                ultBtn.className = "brawl-btn bg-brawl-yellow hover:bg-amber-400 text-black font-brawl text-xs px-3 py-2 rounded-xl border border-black cursor-pointer animate-bounce";
+            } else {
+                ultBtn.disabled = true;
+                ultBtn.className = "brawl-btn bg-slate-700 text-slate-500 font-brawl text-xs px-3 py-2 rounded-xl border border-black disabled:opacity-50 disabled:cursor-not-allowed";
+            }
+        }
+
+        function endGame(isVictory) {
+            clearInterval(timerInterval);
+
+            const banner = document.getElementById('result-banner');
+            const emoji = document.getElementById('result-emoji');
+            
+            if (isVictory) {
+                banner.textContent = 'VICTORY! 보스 격파!';
+                banner.className = 'py-3 rounded-2xl border-4 border-black font-brawl text-3xl sm:text-4xl text-stroke shadow-xl bg-brawl-green text-black';
+                emoji.textContent = '🏆';
+                score += 500; // Victory bonus
+            } else {
+                banner.textContent = 'DEFEAT... 타임 아웃';
+                banner.className = 'py-3 rounded-2xl border-4 border-black font-brawl text-3xl sm:text-4xl text-stroke shadow-xl bg-brawl-red text-white';
+                emoji.textContent = '💀';
+            }
+
+            const accuracy = totalAttempts > 0 ? Math.round((correctCount / totalAttempts) * 100) : 0;
+            const damageDealt = maxBossHp - currentBossHp;
+
+            document.getElementById('res-damage').textContent = `${damageDealt} HP`;
+            document.getElementById('res-correct').textContent = `${correctCount}개`;
+            document.getElementById('res-accuracy').textContent = `${accuracy}%`;
+            document.getElementById('res-score').textContent = `${score} PT`;
+
+            gameScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+        }
+
+        // Initialize default selection on page load
+        selectBrawler('colt');
+        selectDifficulty('normal');
+    </script>
+</body>
+</html>
